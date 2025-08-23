@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-R" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Dev AI Toolkit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'primary': '#2563eb', // blue-600
+              'primary-hover': '#1d4ed8', // blue-700
+              'secondary': '#4b5563', // gray-600
+              'background': '#111827', // gray-900
+              'surface': '#1f2937', // gray-800
+              'surface-hover': '#374151', // gray-700
+              'text-primary': '#f9fafb', // gray-50
+              'text-secondary': '#d1d5db', // gray-300
+              'border': '#374151', // gray-700
+            },
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.10.0",
+    "openai": "https://esm.sh/openai@4.52.7",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom": "https://esm.sh/react-dom@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react-markdown": "https://esm.sh/react-markdown@9.0.1",
+    "remark-gfm": "https://esm.sh/remark-gfm@4.0.0",
+    "react-syntax-highlighter": "https://esm.sh/react-syntax-highlighter@15.5.0",
+    "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus": "https://esm.sh/react-syntax-highlighter@15.5.0/dist/esm/styles/prism/vsc-dark-plus",
+    "react-syntax-highlighter/": "https://esm.sh/react-syntax-highlighter@^15.6.1/",
+    "openai/": "https://esm.sh/openai@^5.10.2/",
+    "@react-oauth/google": "https://esm.sh/@react-oauth/google@^0.12.2",
+    "@clerk/themes": "https://esm.sh/@clerk/themes@^2.4.10",
+    "@clerk/clerk-react": "https://esm.sh/@clerk/clerk-react@^5.42.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-background text-text-primary">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

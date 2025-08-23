@@ -1,0 +1,6 @@
+{
+  "name": "Assistant AI Toolkit",
+  "description": "An interface for web developers to interact with specialized AI assistants. Build, debug, and learn using AI partners expert in Node.js, Vue, Vite, Shadcn, and more. Features simulated CI/CD workflows and conversational code generation.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
