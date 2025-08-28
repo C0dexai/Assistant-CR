@@ -9,7 +9,7 @@ export interface BaseAssistant {
 
 export interface GeminiAssistant extends BaseAssistant {
   provider: 'gemini';
-  model: 'gemini-2.5-flash';
+  model: string;
 }
 
 export interface OpenAI_Assistant extends BaseAssistant {

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Assistant, Thread, Message as MessageType } from '../../types';
+import { Assistant, Thread, Message as MessageType, GoogleDriveFile } from '../../types';
 import Message from './Message';
 import MessageInput from './MessageInput';
 
@@ -9,9 +9,11 @@ interface ChatPanelProps {
   messages: MessageType[];
   isStreaming: boolean;
   onSendMessage: (content: string) => void;
+  attachedFile: GoogleDriveFile | null;
+  onRemoveAttachment: () => void;
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ assistant, thread, messages, isStreaming, onSendMessage }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ assistant, thread, messages, isStreaming, onSendMessage, attachedFile, onRemoveAttachment }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -40,6 +42,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ assistant, thread, messages, isSt
         <MessageInput 
           onSendMessage={onSendMessage} 
           isSending={isStreaming}
+          attachedFile={attachedFile}
+          onRemoveAttachment={onRemoveAttachment}
         />
       </footer>
     </div>

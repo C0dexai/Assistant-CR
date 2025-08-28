@@ -1,13 +1,17 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Assistant, Thread, Message, OpenAI_Assistant, GeminiAssistant } from '../types';
+import { Assistant, Thread, Message, OpenAI_Assistant, GeminiAssistant, GoogleUserProfile, GoogleDriveFile } from '../types';
 import AssistantsPanel from '../components/sidebar/AssistantsPanel';
 import MainContent from '../components/main/MainContent';
 import * as geminiService from '../services/geminiService';
 import * as openAiService from '../services/openAiService';
+import * as googleDriveService from '../services/googleDrive';
 import { RobotIcon } from '../components/icons/RobotIcon';
 import { OrchestrationIcon } from '../components/icons/OrchestrationIcon';
 import WelcomeScreen from '../components/main/WelcomeScreen';
 import OrchestrationPanel from '../components/orchestration/OrchestrationPanel';
+import { GoogleIcon } from '../components/icons/GoogleIcon';
+import GoogleAuth from '../components/auth/GoogleAuth';
+
 
 type ActiveView = 'assistants' | 'workflow';
 
@@ -22,27 +26,55 @@ const AppLayout: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('assistants');
+
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
+  const [googleUser, setGoogleUser] = useState<GoogleUserProfile | null>(null);
+  const [attachedFile, setAttachedFile] = useState<GoogleDriveFile | null>(null);
+  
+  const isGoogleAuthEnabled = !!process.env.GOOGLE_CLIENT_ID;
   
   const selectedAssistant = useMemo(() => assistants.find(a => a.id === selectedAssistantId), [assistants, selectedAssistantId]);
   const currentThreads = useMemo(() => (selectedAssistantId ? threads[selectedAssistantId] : []) || [], [threads, selectedAssistantId]);
   const currentMessages = useMemo(() => (selectedThreadId ? messages[selectedThreadId] : []) || [], [messages, selectedThreadId]);
 
-  const handleCreateAssistant = useCallback(async (name: string, instructions: string, provider: 'gemini' | 'openai') => {
+  const handleGoogleLoginSuccess = async (tokenResponse: { access_token: string }) => {
+    setGoogleAccessToken(tokenResponse.access_token);
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      });
+      const profile = await response.json();
+      setGoogleUser({
+        email: profile.email,
+        name: profile.name,
+        picture: profile.picture,
+      });
+    } catch (e) {
+      setError("Failed to fetch Google user profile.");
+      console.error(e);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+      setError('Google Login Failed. Ensure the GOOGLE_CLIENT_ID is configured correctly and you have accepted the permissions.')
+  }
+
+  const handleGoogleLogout = () => {
+    setGoogleAccessToken(null);
+    setGoogleUser(null);
+    // Note: This doesn't fully sign the user out of their Google account,
+    // but it removes the app's access. The next login will be quicker.
+  };
+
+  const handleCreateAssistant = useCallback(async (name: string, instructions: string, provider: 'gemini' | 'openai', model: string) => {
     setError(null);
     try {
       if (provider === 'gemini') {
-        const newAssistant: GeminiAssistant = {
-          id: `asst_gemini_${Date.now()}`,
-          provider: 'gemini',
-          name,
-          instructions,
-          model: 'gemini-2.5-flash',
-          createdAt: Date.now(),
-        };
+        const newAssistant = await geminiService.createAssistant(name, instructions, model);
         setAssistants(prev => [...prev, newAssistant]);
         setSelectedAssistantId(newAssistant.id);
       } else {
-        const { assistant, vectorStore } = await openAiService.createAssistant(name, instructions);
+        const { assistant, vectorStore } = await openAiService.createAssistant(name, instructions, model);
         const newAssistant: OpenAI_Assistant = {
           id: `asst_openai_${Date.now()}`,
           provider: 'openai',
@@ -142,8 +174,22 @@ const AppLayout: React.FC = () => {
   const handleSendMessage = useCallback(async (content: string) => {
     const thread = currentThreads.find(t => t.id === selectedThreadId);
     if (!selectedThreadId || !selectedAssistant || !thread || isStreaming) return;
+    
+    let finalContent = content;
 
-    const userMessage: Message = { id: `msg_${Date.now()}`, role: 'user', content: content, createdAt: Date.now() };
+    if (attachedFile && googleAccessToken) {
+        try {
+            const fileContent = await googleDriveService.getFileContent(googleAccessToken, attachedFile.id, attachedFile.mimeType);
+            finalContent = `Attached File: ${attachedFile.name}\n\n---\n\n${fileContent}\n\n---\n\n${content}`;
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to fetch attached file content.");
+            return;
+        } finally {
+            setAttachedFile(null);
+        }
+    }
+
+    const userMessage: Message = { id: `msg_${Date.now()}`, role: 'user', content: finalContent, createdAt: Date.now() };
     const history = messages[selectedThreadId] || [];
     setMessages(prev => ({ ...prev, [selectedThreadId]: [...history, userMessage] }));
     
@@ -156,7 +202,7 @@ const AppLayout: React.FC = () => {
     try {
       let responseStream;
       if (selectedAssistant.provider === 'gemini') {
-        const chat = geminiService.createChat(selectedAssistant.instructions, history);
+        const chat = geminiService.createChat(selectedAssistant.instructions, history, selectedAssistant.model);
         responseStream = geminiService.streamAssistantResponse(chat, content);
       } else {
         responseStream = openAiService.streamAssistantResponse(thread.openAiThreadId!, selectedAssistant.openAiAssistantId, content);
@@ -177,7 +223,7 @@ const AppLayout: React.FC = () => {
     } finally {
       setIsStreaming(false);
     }
-  }, [selectedThreadId, selectedAssistant, messages, isStreaming, currentThreads]);
+  }, [selectedThreadId, selectedAssistant, messages, isStreaming, currentThreads, attachedFile, googleAccessToken]);
 
   const handleSelectAssistant = (id: string) => {
     setSelectedAssistantId(id);
@@ -208,6 +254,24 @@ const AppLayout: React.FC = () => {
             <OrchestrationIcon className="w-7 h-7" />
             </NavButton>
         </div>
+        <div className="mt-auto">
+          {isGoogleAuthEnabled ? (
+            <GoogleAuth
+                user={googleUser}
+                onLoginSuccess={handleGoogleLoginSuccess}
+                onLoginError={handleGoogleLoginError}
+                onLogout={handleGoogleLogout}
+            />
+          ) : (
+             <button
+                title="Google integration not configured"
+                disabled
+                className="p-3 rounded-lg w-full flex justify-center items-center text-gray-600 cursor-not-allowed"
+              >
+                <GoogleIcon className="w-7 h-7" />
+              </button>
+          )}
+        </div>
       </nav>
       
       {activeView === 'assistants' && (
@@ -218,7 +282,23 @@ const AppLayout: React.FC = () => {
           
           <main className="flex-1 flex flex-col bg-surface min-w-0">
             {selectedAssistant ? (
-              <MainContent key={selectedAssistant.id} assistant={selectedAssistant} threads={currentThreads} messages={currentMessages} selectedThreadId={selectedThreadId} onSelectThread={setSelectedThreadId} onCreateThread={handleCreateThread} onDeleteThread={handleDeleteThread} isStreaming={isStreaming} onSendMessage={handleSendMessage} onUpdateAssistant={handleUpdateAssistant} />
+              <MainContent 
+                key={selectedAssistant.id} 
+                assistant={selectedAssistant} 
+                threads={currentThreads} 
+                messages={currentMessages} 
+                selectedThreadId={selectedThreadId} 
+                onSelectThread={setSelectedThreadId} 
+                onCreateThread={handleCreateThread} 
+                onDeleteThread={handleDeleteThread} 
+                isStreaming={isStreaming} 
+                onSendMessage={handleSendMessage} 
+                onUpdateAssistant={handleUpdateAssistant} 
+                googleAccessToken={googleAccessToken}
+                onDriveFileSelect={setAttachedFile}
+                attachedFile={attachedFile}
+                onRemoveAttachment={() => setAttachedFile(null)}
+              />
             ) : ( <WelcomeScreen /> )}
           </main>
         </>

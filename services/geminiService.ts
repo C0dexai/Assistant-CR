@@ -1,13 +1,31 @@
 import { GoogleGenAI, Chat, Content } from "@google/genai";
-import { Message } from '../types';
+import { Message, GeminiAssistant } from '../types';
 
 // This is a placeholder for the API key. In a real environment, this would be securely managed.
-const API_KEY = process.env.API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY;
 
-if (!API_KEY) {
-  console.error("API_KEY environment variable not set for Gemini. Using a placeholder. App will not function correctly.");
+if (!GEMINI_API_KEY) {
+  console.error("Neither GEMINI_API_KEY nor API_KEY environment variables are set. Gemini features will not function correctly.");
 }
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY! });
+
+/**
+ * Creates a local representation of a Gemini assistant.
+ * Gemini doesn't have a persistent Assistant API object like OpenAI,
+ * so this function just structures the data.
+ * It's async to match the OpenAI service's signature for consistency.
+ */
+export async function createAssistant(name: string, instructions: string, model: string): Promise<GeminiAssistant> {
+    const newAssistant: GeminiAssistant = {
+      id: `asst_gemini_${Date.now()}`,
+      provider: 'gemini',
+      name,
+      instructions,
+      model,
+      createdAt: Date.now(),
+    };
+    return Promise.resolve(newAssistant);
+}
 
 const transformMessagesToHistory = (messages: Message[]): Content[] => {
     return messages.map(msg => ({
@@ -16,9 +34,9 @@ const transformMessagesToHistory = (messages: Message[]): Content[] => {
     }));
 };
 
-export const createChat = (assistantInstructions: string, history: Message[]): Chat => {
+export const createChat = (assistantInstructions: string, history: Message[], model: string): Chat => {
     return ai.chats.create({
-        model: 'gemini-2.5-flash',
+        model: model,
         config: {
             systemInstruction: assistantInstructions,
         },

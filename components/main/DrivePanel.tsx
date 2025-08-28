@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CredentialResponse } from '@react-oauth/google';
 import * as googleDriveService from '../../services/googleDrive';
 import { GoogleDriveFile } from '../../types';
 import Button from '../ui/Button';
@@ -9,11 +8,11 @@ import { FolderIcon } from '../icons/FolderIcon';
 import { FileIcon } from '../icons/FileIcon';
 
 interface DrivePanelProps {
-  credential: CredentialResponse;
+  accessToken: string;
   onFileSelect: (file: GoogleDriveFile) => void;
 }
 
-const DrivePanel: React.FC<DrivePanelProps> = ({ credential, onFileSelect }) => {
+const DrivePanel: React.FC<DrivePanelProps> = ({ accessToken, onFileSelect }) => {
   const [files, setFiles] = useState<GoogleDriveFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,14 +25,14 @@ const DrivePanel: React.FC<DrivePanelProps> = ({ credential, onFileSelect }) => 
     setIsLoading(true);
     setError(null);
     try {
-      const driveFiles = await googleDriveService.listFiles(credential, currentFolder.id, searchQuery);
+      const driveFiles = await googleDriveService.listFiles(accessToken, currentFolder.id, searchQuery);
       setFiles(driveFiles);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch Google Drive files.');
     } finally {
       setIsLoading(false);
     }
-  }, [credential, currentFolder.id, searchQuery]);
+  }, [accessToken, currentFolder.id, searchQuery]);
 
   useEffect(() => {
     fetchFiles();
@@ -45,6 +44,7 @@ const DrivePanel: React.FC<DrivePanelProps> = ({ credential, onFileSelect }) => 
   };
 
   const handleBreadcrumbClick = (index: number) => {
+    if (index === folderStack.length - 1) return; // Already in this folder
     setSearchQuery('');
     setFolderStack(prev => prev.slice(0, index + 1));
   };
@@ -53,17 +53,22 @@ const DrivePanel: React.FC<DrivePanelProps> = ({ credential, onFileSelect }) => 
       e.preventDefault();
       fetchFiles();
   }
+  
+  const handleSelectAndNotify = (file: GoogleDriveFile) => {
+    onFileSelect(file);
+    // Maybe show a temporary success message/toast here in a future iteration
+  }
 
   const FileItem: React.FC<{file: GoogleDriveFile}> = ({ file }) => {
       const isFolder = file.kind === 'drive#folder';
       return (
         <li className="p-3 flex justify-between items-center hover:bg-surface-hover/50 rounded-lg">
-            <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => isFolder && handleFolderClick(file)}>
+            <button className="flex items-center gap-3 overflow-hidden text-left w-full" onClick={() => isFolder && handleFolderClick(file)}>
                 {isFolder ? <FolderIcon className="w-6 h-6 text-yellow-400 flex-shrink-0" /> : <FileIcon className="w-6 h-6 text-text-secondary flex-shrink-0" />}
                 <span className="font-medium text-text-primary truncate" title={file.name}>{file.name}</span>
-            </div>
+            </button>
             {!isFolder && (
-                <Button variant="secondary" size="sm" onClick={() => onFileSelect(file)}>
+                <Button variant="secondary" size="sm" onClick={() => handleSelectAndNotify(file)}>
                     Attach
                 </Button>
             )}
@@ -87,10 +92,13 @@ const DrivePanel: React.FC<DrivePanelProps> = ({ credential, onFileSelect }) => 
             <Button type="submit">Search</Button>
         </form>
 
-        <div className="flex items-center text-sm text-text-secondary mb-4">
+        <div className="flex items-center text-sm text-text-secondary mb-4 overflow-x-auto whitespace-nowrap pb-2">
           {folderStack.map((folder, index) => (
             <React.Fragment key={folder.id}>
-              <button onClick={() => handleBreadcrumbClick(index)} className="hover:text-primary hover:underline">
+              <button 
+                onClick={() => handleBreadcrumbClick(index)} 
+                className={`hover:text-primary ${index < folderStack.length -1 ? 'hover:underline' : 'font-semibold text-text-primary'}`}
+              >
                 {folder.name}
               </button>
               {index < folderStack.length - 1 && <span className="mx-2">/</span>}

@@ -11,7 +11,7 @@ interface AssistantsPanelProps {
   assistants: Assistant[];
   selectedAssistantId: string | null;
   onSelectAssistant: (id: string) => void;
-  onCreateAssistant: (name: string, instructions: string, provider: 'gemini' | 'openai') => void;
+  onCreateAssistant: (name: string, instructions: string, provider: 'gemini' | 'openai', model: string) => void;
   onDeleteAssistant: (id: string) => void;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Input from '../ui/Input';
 import Textarea from '../ui/Textarea';
@@ -9,21 +9,41 @@ import { OpenAiIcon } from '../icons/OpenAiIcon';
 interface CreateAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, instructions: string, provider: 'gemini' | 'openai') => void;
+  onCreate: (name: string, instructions: string, provider: 'gemini' | 'openai', model: string) => void;
 }
+
+const modelOptions = {
+    gemini: [
+        { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash', description: 'Fast and versatile model for a variety of tasks.' },
+    ],
+    openai: [
+        { id: 'gpt-4o', name: 'GPT-4o', description: 'Our fastest and most affordable flagship model.' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'High-level reasoning, optimized for speed.' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast, capable model for general tasks.' },
+    ]
+};
 
 const CreateAssistantModal: React.FC<CreateAssistantModalProps> = ({ isOpen, onClose, onCreate }) => {
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
   const [provider, setProvider] = useState<'gemini' | 'openai'>('gemini');
+  const [model, setModel] = useState('gemini-2.5-flash');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (provider === 'gemini') {
+        setModel('gemini-2.5-flash');
+    } else {
+        setModel('gpt-4o');
+    }
+  }, [provider]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && instructions.trim()) {
       setIsLoading(true);
       try {
-        await onCreate(name, instructions, provider);
+        await onCreate(name, instructions, provider, model);
         setName('');
         setInstructions('');
         setProvider('gemini');
@@ -42,6 +62,8 @@ const CreateAssistantModal: React.FC<CreateAssistantModalProps> = ({ isOpen, onC
     onClose();
   }
 
+  const modelsToShow = modelOptions[provider];
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Create New Assistant">
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -57,6 +79,24 @@ const CreateAssistantModal: React.FC<CreateAssistantModalProps> = ({ isOpen, onC
               <span>OpenAI</span>
             </button>
           </div>
+        </div>
+
+        <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">Model</label>
+            <div className="space-y-2">
+                {modelsToShow.map(modelOption => (
+                    <button
+                        type="button"
+                        key={modelOption.id}
+                        onClick={() => setModel(modelOption.id)}
+                        className={`w-full text-left p-3 border-2 rounded-lg transition-colors ${model === modelOption.id ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}
+                        aria-pressed={model === modelOption.id}
+                    >
+                        <div className="font-medium text-text-primary">{modelOption.name}</div>
+                        <div className="text-xs text-text-secondary">{modelOption.description}</div>
+                    </button>
+                ))}
+            </div>
         </div>
 
         <div>

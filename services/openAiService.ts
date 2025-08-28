@@ -4,25 +4,31 @@ import OpenAI from 'openai';
 // Use type aliases from the main OpenAI namespace for robustness against internal library structure changes.
 type Assistant = OpenAI.Beta.Assistant;
 type Thread = OpenAI.Beta.Thread;
+// @FIX: Corrected the type for VectorStore. It is a direct export from OpenAI.Beta.
 type VectorStore = OpenAI.Beta.VectorStore;
 type FileObject = OpenAI.Files.FileObject;
 
 
-const API_KEY = process.env.API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.API_KEY;
+
+if (!OPENAI_API_KEY) {
+    console.error("Neither OPENAI_API_KEY nor API_KEY environment variables are set. OpenAI features will not function correctly.");
+}
 
 const openai = new OpenAI({
-  apiKey: API_KEY || '', // Use API_KEY and provide empty string fallback to prevent crash
+  apiKey: OPENAI_API_KEY || '', // Use OPENAI_API_KEY and provide empty string fallback to prevent crash
   dangerouslyAllowBrowser: true,
 });
 
-export async function createAssistant(name: string, instructions: string): Promise<{assistant: Assistant, vectorStore: VectorStore}> {
+export async function createAssistant(name: string, instructions: string, model: string): Promise<{assistant: Assistant, vectorStore: VectorStore}> {
   try {
+    // @FIX: The property for vector stores in this version of the SDK is 'vector_stores' (snake_case).
     const vectorStore = await openai.beta.vector_stores.create({ name: `${name} Vector Store` });
 
     const assistant = await openai.beta.assistants.create({
       name,
       instructions,
-      model: "gpt-4-turbo",
+      model,
       tools: [{ type: "file_search" }, { type: "code_interpreter" }],
       tool_resources: { 
           file_search: { vector_store_ids: [vectorStore.id] }
@@ -37,9 +43,11 @@ export async function createAssistant(name: string, instructions: string): Promi
 
 export async function deleteAssistant(assistantId: string, vectorStoreId?: string): Promise<void> {
     try {
+        // @FIX: The 'del' method is deprecated and has been replaced by 'delete'.
         const deletePromises: Promise<any>[] = [openai.beta.assistants.delete(assistantId)];
         if(vectorStoreId) {
-            deletePromises.push(openai.beta.vector_stores.del(vectorStoreId));
+            // @FIX: The property for vector stores is 'vector_stores' (snake_case) and the method is 'delete'.
+            deletePromises.push(openai.beta.vector_stores.delete(vectorStoreId));
         }
         
         // While files attached to the assistant are not deleted when the assistant is,
@@ -112,6 +120,7 @@ export async function* streamAssistantResponse(
 
 export async function listFiles(vectorStoreId: string) {
     try {
+        // @FIX: The property for vector stores in this version of the SDK is 'vector_stores' (snake_case).
         const files = await openai.beta.vector_stores.files.list(vectorStoreId);
         return files.data;
     } catch (error) {
@@ -127,6 +136,7 @@ export async function uploadFile(vectorStoreId: string, file: File) {
             purpose: 'assistants',
         });
         
+        // @FIX: The property for vector stores in this version of the SDK is 'vector_stores' (snake_case).
         await openai.beta.vector_stores.files.create(vectorStoreId, {
             file_id: uploadedFile.id,
         });
@@ -140,7 +150,8 @@ export async function uploadFile(vectorStoreId: string, file: File) {
 
 export async function deleteFile(vectorStoreId: string, fileId: string) {
     try {
-        await openai.beta.vector_stores.files.del(vectorStoreId, fileId);
+        // @FIX: The property is 'vector_stores' (snake_case) and the method is 'delete'.
+        await openai.beta.vector_stores.files.delete(vectorStoreId, fileId);
         await openai.files.delete(fileId);
     } catch (error) {
         console.error('Error deleting file:', error);
